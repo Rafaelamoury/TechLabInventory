@@ -1,0 +1,16 @@
+# Arquivos compilados do Java
+*.class
+
+# Bibliotecas externas
+*.jar
+
+# Banco de dados local
+*.db
+
+# Arquivos temporarios
+*.log
+*.tmp
+
+# Configuracoes locais
+.vscode/
+.idea/
