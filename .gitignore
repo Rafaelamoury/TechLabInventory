@@ -16,3 +16,6 @@
 .idea/
 # Arquivos gerados pelo Maven
 target/
+
+# Banco SQLite gerado automaticamente
+dados/

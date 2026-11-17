@@ -30,8 +30,8 @@ import java.util.Scanner;
 
 /**
  * Menu da aplicacao TechLab, usando os DAOs e o modelo da disciplina.
- * Na fase 4 trabalha exclusivamente com a COPIA do banco de testes;
- * o controle tambem e aplicado por ConexaoBanco.
+ * Por padrao utiliza banco novo isolado em dados/techlab-inventory.db.
+ * Opcionalmente permite o banco de testes ja migrado.
  */
 public final class Main {
     private final Scanner entrada;
@@ -51,13 +51,15 @@ public final class Main {
     }
 
     public static void main(String[] args) {
-        if (args.length != 1) {
-            System.err.println("Uso: java Techlab.Main techlab-fase2-teste.db");
+        if (args.length > 1) {
+            System.err.println("Uso: java Techlab.Main [techlab-fase2-teste.db]");
             System.exit(2);
         }
         try {
-            ConexaoBanco banco = new ConexaoBanco(Path.of(args[0]));
+            Path caminho = args.length == 0 ? ConexaoBanco.CAMINHO_PADRAO : Path.of(args[0]);
+            ConexaoBanco banco = new ConexaoBanco(caminho);
             banco.inicializarBanco();
+            System.out.println("Banco em uso: " + caminho.toAbsolutePath().normalize());
             try (Scanner scanner = new Scanner(System.in, StandardCharsets.UTF_8)) {
                 new Main(scanner, new AtivoDAO(banco), new ChamadoDAO(banco),
                         new AtivoArquivoRepository(banco),
