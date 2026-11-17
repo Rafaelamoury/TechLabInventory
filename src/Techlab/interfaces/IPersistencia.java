@@ -1,0 +1,13 @@
+package Techlab.interfaces;
+
+import java.sql.SQLException;
+import java.util.List;
+
+/** Contrato generico CRUD do professor. */
+public interface IPersistencia<T> {
+    void salvar(T objeto) throws SQLException;
+    T buscarPorId(int id) throws SQLException;
+    List<T> listarTodos() throws SQLException;
+    void atualizar(T objeto) throws SQLException;
+    void deletar(int id) throws SQLException;
+}
