@@ -1,5 +1,6 @@
 package Techlab.db;
 
+import Techlab.exceptions.FalhaConexaoBDException;
 import Techlab.interfaces.IConexaoBD;
 
 import java.nio.file.Files;
@@ -39,14 +40,19 @@ public final class ConexaoBanco implements IConexaoBD {
         if (!Files.isRegularFile(this.banco)) {
             throw new SQLException("Banco de testes nao encontrado: " + this.banco);
         }
-        Connection conexao = DriverManager.getConnection("jdbc:sqlite:" + this.banco);
+        Connection conexao;
+        try {
+            conexao = DriverManager.getConnection("jdbc:sqlite:" + this.banco);
+        } catch (SQLException falha) {
+            throw new FalhaConexaoBDException("Falha ao abrir conexao SQLite.", falha);
+        }
         try (Statement stmt = conexao.createStatement()) {
             // PRAGMA foreign_keys e configurado por conexao no SQLite.
             stmt.execute("PRAGMA foreign_keys = ON");
             return conexao;
         } catch (SQLException e) {
             try { conexao.close(); } catch (SQLException fechamento) { e.addSuppressed(fechamento); }
-            throw e;
+            throw new FalhaConexaoBDException("Falha ao configurar conexao SQLite.", e);
         }
     }
 

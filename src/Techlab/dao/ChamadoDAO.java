@@ -1,5 +1,6 @@
 package Techlab.dao;
 
+import Techlab.exceptions.ChamadoNaoEncontradoException;
 import Techlab.interfaces.IConexaoBD;
 import Techlab.interfaces.IPersistencia;
 import Techlab.negocio.ChamadoSuporte;
@@ -89,7 +90,7 @@ public final class ChamadoDAO implements IPersistencia<ChamadoSuporte> {
              PreparedStatement stmt = conn.prepareStatement(sql)) {
             preencher(stmt, chamado);
             stmt.setInt(6, chamado.getId());
-            if (stmt.executeUpdate() != 1) throw new SQLException("Chamado nao encontrado: " + chamado.getId());
+            if (stmt.executeUpdate() != 1) throw new ChamadoNaoEncontradoException(chamado.getId());
         }
     }
 
@@ -99,7 +100,7 @@ public final class ChamadoDAO implements IPersistencia<ChamadoSuporte> {
         try (Connection conn = banco.obterConexao();
              PreparedStatement stmt = conn.prepareStatement("DELETE FROM chamados WHERE id=?")) {
             stmt.setInt(1, id);
-            if (stmt.executeUpdate() != 1) throw new SQLException("Chamado nao encontrado: " + id);
+            if (stmt.executeUpdate() != 1) throw new ChamadoNaoEncontradoException(id);
         }
     }
 

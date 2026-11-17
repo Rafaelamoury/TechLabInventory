@@ -1,5 +1,7 @@
 package Techlab.dao;
 
+import Techlab.exceptions.EquipamentoComChamadosException;
+import Techlab.exceptions.EquipamentoNaoEncontradoException;
 import Techlab.interfaces.IConexaoBD;
 import Techlab.interfaces.IPersistencia;
 import Techlab.negocio.AtivoTI;
@@ -103,7 +105,7 @@ public final class AtivoDAO implements IPersistencia<AtivoTI> {
             preencherParametros(stmt, ativo);
             stmt.setInt(13, ativo.getId());
             if (stmt.executeUpdate() != 1) {
-                throw new SQLException("Ativo nao encontrado para atualizar: " + ativo.getId());
+                throw new EquipamentoNaoEncontradoException(ativo.getId());
             }
         }
     }
@@ -117,15 +119,14 @@ public final class AtivoDAO implements IPersistencia<AtivoTI> {
                 vinculos.setInt(1, id);
                 try (ResultSet rs = vinculos.executeQuery()) {
                     if (rs.next() && rs.getLong(1) > 0) {
-                        throw new SQLException("Nao e permitido excluir ativo " + id
-                                + ": existem chamados vinculados.");
+                        throw new EquipamentoComChamadosException(id);
                     }
                 }
             }
             try (PreparedStatement excluir = conn.prepareStatement("DELETE FROM ativos WHERE id = ?")) {
                 excluir.setInt(1, id);
                 if (excluir.executeUpdate() != 1) {
-                    throw new SQLException("Ativo nao encontrado para excluir: " + id);
+                    throw new EquipamentoNaoEncontradoException(id);
                 }
             }
         }
