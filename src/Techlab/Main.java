@@ -5,6 +5,8 @@ import Techlab.dao.AtivoResumo;
 import Techlab.dao.ChamadoDAO;
 import Techlab.dao.ChamadoResumo;
 import Techlab.db.ConexaoBanco;
+import Techlab.dto.AtivoCsvRegistro;
+import Techlab.repository.AtivoArquivoRepository;
 import Techlab.negocio.AtivoTI;
 import Techlab.negocio.ChamadoSuporte;
 import Techlab.negocio.DispositivoRede;
@@ -12,6 +14,7 @@ import Techlab.negocio.EstacaoTrabalho;
 import Techlab.negocio.PrioridadeChamado;
 import Techlab.negocio.Servidor;
 
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.sql.SQLException;
@@ -31,11 +34,14 @@ public final class Main {
     private final Scanner entrada;
     private final AtivoDAO ativos;
     private final ChamadoDAO chamados;
+    private final AtivoArquivoRepository arquivos;
 
-    private Main(Scanner entrada, AtivoDAO ativos, ChamadoDAO chamados) {
+    private Main(Scanner entrada, AtivoDAO ativos, ChamadoDAO chamados,
+                 AtivoArquivoRepository arquivos) {
         this.entrada = entrada;
         this.ativos = ativos;
         this.chamados = chamados;
+        this.arquivos = arquivos;
     }
 
     public static void main(String[] args) {
@@ -47,7 +53,8 @@ public final class Main {
             ConexaoBanco banco = new ConexaoBanco(Path.of(args[0]));
             banco.inicializarBanco();
             try (Scanner scanner = new Scanner(System.in, StandardCharsets.UTF_8)) {
-                new Main(scanner, new AtivoDAO(banco), new ChamadoDAO(banco)).executar();
+                new Main(scanner, new AtivoDAO(banco), new ChamadoDAO(banco),
+                        new AtivoArquivoRepository(banco)).executar();
             }
         } catch (IllegalArgumentException | IllegalStateException e) {
             System.err.println("Falha ao iniciar: " + e.getMessage());
@@ -69,7 +76,7 @@ public final class Main {
             }
             try {
                 executarOpcao(opcao);
-            } catch (SQLException | IllegalArgumentException | DateTimeException e) {
+            } catch (SQLException | IOException | IllegalArgumentException | DateTimeException e) {
                 System.out.println("[ERRO] " + e.getMessage());
             } catch (IllegalStateException e) {
                 System.out.println("[ERRO] " + e.getMessage());
@@ -90,11 +97,13 @@ public final class Main {
         System.out.println("8  - Consultar chamado por ID");
         System.out.println("9  - Atualizar chamado completo");
         System.out.println("10 - Excluir chamado");
+        System.out.println("11 - Exportar equipamentos para CSV");
+        System.out.println("12 - Importar equipamentos novos de CSV");
         System.out.println("0  - Sair");
         System.out.print("Opcao: ");
     }
 
-    private void executarOpcao(String opcao) throws SQLException {
+    private void executarOpcao(String opcao) throws SQLException, IOException {
         switch (opcao) {
             case "1" -> listarAtivos();
             case "2" -> cadastrarAtivo();
@@ -106,6 +115,8 @@ public final class Main {
             case "8" -> consultarChamado();
             case "9" -> atualizarChamado();
             case "10" -> excluirChamado();
+            case "11" -> exportarCsv();
+            case "12" -> importarCsv();
             default -> System.out.println("Opcao invalida. Escolha um numero do menu.");
         }
     }
@@ -277,9 +288,36 @@ public final class Main {
         return null;
     }
 
+    private void exportarCsv() throws SQLException, IOException {
+        Path destino = Path.of("..", "TechLabCSV-exportacoes", "ativos-" + System.currentTimeMillis() + ".csv");
+        int total = arquivos.exportarBanco(destino);
+        System.out.println("CSV criado: " + destino.toAbsolutePath().normalize());
+        System.out.println("Equipamentos exportados: " + total
+                + " (inclui registros antigos incompletos, sem inventar valores).");
+    }
+
+    private void importarCsv() throws SQLException, IOException {
+        Path origem = Path.of(lerObrigatorio("Caminho do arquivo CSV: "));
+        List<AtivoCsvRegistro> registros = arquivos.carregarTodos(origem);
+        System.out.println("Registros validos encontrados: " + registros.size());
+        for (AtivoCsvRegistro r : registros) {
+            System.out.println("   " + r.patrimonio() + " | " + r.categoria()
+                    + (r.completo() ? "" : " | INCOMPLETO: " + String.join(", ", r.pendencias())));
+        }
+        System.out.println("IDs do CSV nao serao reutilizados. Registros com patrimonio ja existente serao ignorados.");
+        System.out.print("Para importar SOMENTE novos, digite IMPORTAR: ");
+        if (!"IMPORTAR".equalsIgnoreCase(lerLinha().trim())) {
+            System.out.println("Importacao cancelada.");
+            return;
+        }
+        AtivoArquivoRepository.ResultadoImportacao resultado = arquivos.importarNovos(origem);
+        System.out.println("Importacao concluida: " + resultado.importados()
+                + " novos, " + resultado.jaExistentes() + " ja cadastrados (preservados).");
+    }
+
     private boolean confirmarExclusao() {
         System.out.print("Para confirmar, digite EXCLUIR (qualquer outra coisa cancela): ");
-        return "EXCLUIR".equals(lerLinha().trim());
+        return "EXCLUIR".equalsIgnoreCase(lerLinha().trim());
     }
 
     private String lerObrigatorio(String rotulo) {
