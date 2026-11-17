@@ -7,6 +7,7 @@ import Techlab.dao.ChamadoResumo;
 import Techlab.db.ConexaoBanco;
 import Techlab.dto.AtivoCsvRegistro;
 import Techlab.repository.AtivoArquivoRepository;
+import Techlab.service.ComplementacaoLegadosService;
 import Techlab.negocio.AtivoTI;
 import Techlab.negocio.ChamadoSuporte;
 import Techlab.negocio.DispositivoRede;
@@ -21,7 +22,9 @@ import java.sql.SQLException;
 import java.time.DateTimeException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Locale;
 import java.util.Scanner;
 
@@ -35,13 +38,16 @@ public final class Main {
     private final AtivoDAO ativos;
     private final ChamadoDAO chamados;
     private final AtivoArquivoRepository arquivos;
+    private final ComplementacaoLegadosService legados;
 
     private Main(Scanner entrada, AtivoDAO ativos, ChamadoDAO chamados,
-                 AtivoArquivoRepository arquivos) {
+                 AtivoArquivoRepository arquivos,
+                 ComplementacaoLegadosService legados) {
         this.entrada = entrada;
         this.ativos = ativos;
         this.chamados = chamados;
         this.arquivos = arquivos;
+        this.legados = legados;
     }
 
     public static void main(String[] args) {
@@ -54,7 +60,8 @@ public final class Main {
             banco.inicializarBanco();
             try (Scanner scanner = new Scanner(System.in, StandardCharsets.UTF_8)) {
                 new Main(scanner, new AtivoDAO(banco), new ChamadoDAO(banco),
-                        new AtivoArquivoRepository(banco)).executar();
+                        new AtivoArquivoRepository(banco),
+                        new ComplementacaoLegadosService(banco)).executar();
             }
         } catch (IllegalArgumentException | IllegalStateException e) {
             System.err.println("Falha ao iniciar: " + e.getMessage());
@@ -99,6 +106,8 @@ public final class Main {
         System.out.println("10 - Excluir chamado");
         System.out.println("11 - Exportar equipamentos para CSV");
         System.out.println("12 - Importar equipamentos novos de CSV");
+        System.out.println("13 - Completar cadastro antigo de equipamento");
+        System.out.println("14 - Completar cadastro antigo de chamado");
         System.out.println("0  - Sair");
         System.out.print("Opcao: ");
     }
@@ -117,6 +126,8 @@ public final class Main {
             case "10" -> excluirChamado();
             case "11" -> exportarCsv();
             case "12" -> importarCsv();
+            case "13" -> completarAtivoAntigo();
+            case "14" -> completarChamadoAntigo();
             default -> System.out.println("Opcao invalida. Escolha um numero do menu.");
         }
     }
@@ -313,6 +324,78 @@ public final class Main {
         AtivoArquivoRepository.ResultadoImportacao resultado = arquivos.importarNovos(origem);
         System.out.println("Importacao concluida: " + resultado.importados()
                 + " novos, " + resultado.jaExistentes() + " ja cadastrados (preservados).");
+    }
+
+    /** Preenche apenas valores ausentes; os demais campos e IDs ficam intactos. */
+    private void completarAtivoAntigo() throws SQLException {
+        listarAtivos();
+        int id = lerInteiroPositivo("ID do equipamento antigo: ");
+        List<String> campos = legados.camposPendentesAtivo(id);
+        if (campos.isEmpty()) {
+            System.out.println("Este equipamento ja esta completo.");
+            return;
+        }
+        System.out.println("PENDENCIAS: " + String.join(", ", campos));
+        System.out.println("Informe somente dados conhecidos e confirmados. Enter cancela sem gravar.");
+        Map<String, String> valores = coletarCampos(campos);
+        System.out.print("Digite COMPLETAR para confirmar [ou Enter para cancelar]: ");
+        if (!"COMPLETAR".equalsIgnoreCase(lerLinha().trim())) {
+            System.out.println("Complementacao cancelada. Nenhum dado alterado.");
+            return;
+        }
+        legados.completarAtivo(id, valores);
+        System.out.println("Cadastro do equipamento " + id + " completado, preservando ID e patrimonio.");
+    }
+
+    private void completarChamadoAntigo() throws SQLException {
+        listarChamados();
+        int id = lerInteiroPositivo("ID do chamado antigo: ");
+        List<String> campos = legados.camposPendentesChamado(id);
+        if (campos.isEmpty()) {
+            System.out.println("Este chamado ja esta completo.");
+            return;
+        }
+        System.out.println("PENDENCIAS: " + String.join(", ", campos));
+        System.out.println("Nao invente data de abertura historica. Enter cancela sem gravar.");
+        Map<String, String> valores = coletarCampos(campos);
+        System.out.print("Digite COMPLETAR para confirmar [ou Enter para cancelar]: ");
+        if (!"COMPLETAR".equalsIgnoreCase(lerLinha().trim())) {
+            System.out.println("Complementacao cancelada. Nenhum dado alterado.");
+            return;
+        }
+        legados.completarChamado(id, valores);
+        System.out.println("Cadastro do chamado " + id + " completado, preservando descricao e vinculo.");
+    }
+
+    private Map<String, String> coletarCampos(List<String> campos) {
+        Map<String, String> valores = new LinkedHashMap<>();
+        for (String campo : campos) {
+            System.out.print(rotuloComplementacao(campo) + ": ");
+            String valor = lerLinha().trim();
+            if (valor.isBlank()) {
+                throw new IllegalStateException("Cancelado: campo " + campo
+                        + " sem informacao. Nenhuma alteracao feita.");
+            }
+            valores.put(campo, valor);
+        }
+        return valores;
+    }
+
+    private static String rotuloComplementacao(String campo) {
+        return switch (campo) {
+            case "status" -> "Status (ex.: Ativo)";
+            case "data_aquisicao" -> "Data REAL de aquisicao (AAAA-MM-DD)";
+            case "ip_estatico" -> "IP estatico";
+            case "sistema_operacional" -> "Sistema operacional";
+            case "memoria_ram_gb" -> "Memoria RAM em GB";
+            case "departamento" -> "Departamento";
+            case "responsavel" -> "Responsavel";
+            case "numero_portas" -> "Numero de portas";
+            case "titulo" -> "Titulo";
+            case "prioridade" -> "Prioridade (BAIXA/MEDIA/ALTA/CRITICA)";
+            case "data_abertura" -> "Data/hora REAL de abertura (AAAA-MM-DDTHH:MM)";
+            default -> campo;
+        };
     }
 
     private boolean confirmarExclusao() {
