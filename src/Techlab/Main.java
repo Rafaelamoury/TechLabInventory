@@ -8,6 +8,9 @@ import Techlab.db.ConexaoBanco;
 import Techlab.dto.AtivoCsvRegistro;
 import Techlab.repository.AtivoArquivoRepository;
 import Techlab.service.ComplementacaoLegadosService;
+import Techlab.service.ChamadoService;
+import Techlab.service.ConsultaService;
+import Techlab.service.NotificadorConsole;
 import Techlab.negocio.AtivoTI;
 import Techlab.negocio.ChamadoSuporte;
 import Techlab.negocio.DispositivoRede;
@@ -39,15 +42,17 @@ public final class Main {
     private final ChamadoDAO chamados;
     private final AtivoArquivoRepository arquivos;
     private final ComplementacaoLegadosService legados;
+    private final ChamadoService servicoChamados;
 
     private Main(Scanner entrada, AtivoDAO ativos, ChamadoDAO chamados,
                  AtivoArquivoRepository arquivos,
-                 ComplementacaoLegadosService legados) {
+                 ComplementacaoLegadosService legados, ChamadoService servicoChamados) {
         this.entrada = entrada;
         this.ativos = ativos;
         this.chamados = chamados;
         this.arquivos = arquivos;
         this.legados = legados;
+        this.servicoChamados = servicoChamados;
     }
 
     public static void main(String[] args) {
@@ -61,9 +66,11 @@ public final class Main {
             banco.inicializarBanco();
             System.out.println("Banco em uso: " + caminho.toAbsolutePath().normalize());
             try (Scanner scanner = new Scanner(System.in, StandardCharsets.UTF_8)) {
-                new Main(scanner, new AtivoDAO(banco), new ChamadoDAO(banco),
+                ChamadoDAO chamadoDAO = new ChamadoDAO(banco);
+                new Main(scanner, new AtivoDAO(banco), chamadoDAO,
                         new AtivoArquivoRepository(banco),
-                        new ComplementacaoLegadosService(banco)).executar();
+                        new ComplementacaoLegadosService(banco),
+                        new ChamadoService(chamadoDAO, new NotificadorConsole())).executar();
             }
         } catch (IllegalArgumentException | IllegalStateException e) {
             System.err.println("Falha ao iniciar: " + e.getMessage());
@@ -110,6 +117,8 @@ public final class Main {
         System.out.println("12 - Importar equipamentos novos de CSV");
         System.out.println("13 - Completar cadastro antigo de equipamento");
         System.out.println("14 - Completar cadastro antigo de chamado");
+        System.out.println("15 - Filtrar equipamentos e ordenar por patrimonio");
+        System.out.println("16 - Filtrar chamados e ordenar por descricao");
         System.out.println("0  - Sair");
         System.out.print("Opcao: ");
     }
@@ -130,6 +139,8 @@ public final class Main {
             case "12" -> importarCsv();
             case "13" -> completarAtivoAntigo();
             case "14" -> completarChamadoAntigo();
+            case "15" -> filtrarAtivos();
+            case "16" -> filtrarChamados();
             default -> System.out.println("Opcao invalida. Escolha um numero do menu.");
         }
     }
@@ -253,7 +264,7 @@ public final class Main {
         ChamadoSuporte chamado = new ChamadoSuporte(
                 lerObrigatorio("Titulo: "), lerObrigatorio("Descricao: "),
                 lerPrioridade(), LocalDateTime.now(), ativoId);
-        chamados.salvar(chamado);
+        servicoChamados.abrir(chamado);
         System.out.println("Chamado aberto com ID " + chamado.getId());
     }
 
@@ -282,7 +293,7 @@ public final class Main {
         System.out.print("Nova prioridade (BAIXA/MEDIA/ALTA/CRITICA) [Enter mantem]: ");
         String prioridade = lerLinha().trim();
         if (!prioridade.isEmpty()) c.setPrioridade(PrioridadeChamado.valueOf(prioridade.toUpperCase(Locale.ROOT)));
-        chamados.atualizar(c);
+        servicoChamados.atualizar(c);
         System.out.println("Chamado atualizado: " + id);
     }
 
@@ -299,6 +310,25 @@ public final class Main {
     private ChamadoResumo resumoChamado(int id) throws SQLException {
         for (ChamadoResumo r : chamados.listarResumos()) if (r.id() == id) return r;
         return null;
+    }
+
+    /** Demonstra filtragem e ordenacao de DTOs em colecoes Java (inclusive legados). */
+    private void filtrarAtivos() throws SQLException {
+        System.out.print("Buscar patrimonio, modelo ou categoria [Enter lista todos]: ");
+        String termo = lerLinha().trim();
+        List<AtivoResumo> resultado = ConsultaService.filtrarEOrdenarAtivos(ativos.listarResumos(), termo);
+        System.out.println("\nEQUIPAMENTOS ENCONTRADOS (" + resultado.size() + "):");
+        if (resultado.isEmpty()) System.out.println("Nenhum equipamento encontrado.");
+        for (AtivoResumo r : resultado) exibirResumoAtivo(r);
+    }
+
+    private void filtrarChamados() throws SQLException {
+        System.out.print("Buscar na descricao do chamado [Enter lista todos]: ");
+        String termo = lerLinha().trim();
+        List<ChamadoResumo> resultado = ConsultaService.filtrarEOrdenarChamados(chamados.listarResumos(), termo);
+        System.out.println("\nCHAMADOS ENCONTRADOS (" + resultado.size() + "):");
+        if (resultado.isEmpty()) System.out.println("Nenhum chamado encontrado.");
+        for (ChamadoResumo r : resultado) exibirResumoChamado(r);
     }
 
     private void exportarCsv() throws SQLException, IOException {
@@ -419,7 +449,12 @@ public final class Main {
     }
 
     private int lerInteiro(String rotulo) {
-        return Integer.parseInt(lerObrigatorio(rotulo));
+        String texto = lerObrigatorio(rotulo);
+        try {
+            return Integer.parseInt(texto);
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("Informe um numero inteiro valido para: " + rotulo.trim());
+        }
     }
 
     private int lerInteiroPositivo(String rotulo) {
@@ -431,7 +466,12 @@ public final class Main {
     private int lerInteiroOpcional(String rotulo, int anterior) {
         System.out.print(rotulo);
         String texto = lerLinha().trim();
-        return texto.isEmpty() ? anterior : Integer.parseInt(texto);
+        if (texto.isEmpty()) return anterior;
+        try {
+            return Integer.parseInt(texto);
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("Informe um numero inteiro valido para: " + rotulo.trim());
+        }
     }
 
     private LocalDateTime lerData(String rotulo) {
