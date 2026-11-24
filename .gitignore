@@ -19,3 +19,20 @@ target/
 
 # Banco SQLite gerado automaticamente
 dados/
+
+# Arquivos auxiliares do SQLite
+*.db-wal
+*.db-shm
+*.db-journal
+
+# Diretorios de compilacao manual
+bin/
+out/
+
+# Configuracoes sensiveis locais
+.env
+.env.*
+!.env.example
+*.p12
+*.pfx
+*.jks

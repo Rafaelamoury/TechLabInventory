@@ -6,7 +6,7 @@
 
     <groupId>br.edu.techlab</groupId>
     <artifactId>techlab-inventory</artifactId>
-    <version>1.0.0-SNAPSHOT</version>
+    <version>1.0.0</version>
     <name>TechLab Inventory &amp; Service Desk</name>
     <description>Projeto de Programacao Orientada a Objetos e Persistencia em Java.</description>
 

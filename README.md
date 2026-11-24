@@ -2,7 +2,7 @@
 
 Sistema de linha de comando, desenvolvido em **Java 21**, para gerenciar equipamentos de tecnologia da informação e chamados de suporte. O projeto integra conceitos de **Programação Orientada a Objetos (POO)**, persistência em **SQLite** e arquivos **CSV**, com organização por responsabilidades, tratamento de exceções e testes automatizados.
 
-> **Situação:** versão em preparação para a entrega final da disciplina de Programação Orientada a Objetos e Persistência. A implementação consolidada está na branch `feat/integracao-professor`. **A branch `main` ainda precisa receber essa versão antes da entrega**, e a tag `v1.0-final` ainda não foi criada.
+> **Projeto acadêmico:** desenvolvido para a disciplina de Programação Orientada a Objetos e Persistência.
 
 ## Funcionalidades
 
@@ -41,7 +41,7 @@ Sistema de linha de comando, desenvolvido em **Java 21**, para gerenciar equipam
 A partir do terminal (PowerShell, bash ou terminal do VS Code):
 
 ```bash
-git clone --branch feat/integracao-professor https://github.com/Rafaelamoury/TechLabInventory.git
+git clone https://github.com/Rafaelamoury/TechLabInventory.git
 cd TechLabInventory
 mvn clean package
 mvn exec:java
@@ -79,7 +79,7 @@ Para encerrar a aplicação normalmente, selecione `0` no menu.
 mvn clean test
 ```
 
-Na validação de **18/11/2026**, a suíte executou **21 testes JUnit 5**, com **0 falhas, 0 erros e 0 testes ignorados**. A cobertura inclui modelagem e validação do domínio, DAOs, conexão SQLite, persistência CSV, filtros e notificações. Os testes de integração com o banco utilizam arquivos SQLite temporários; **não utilizam o banco local `dados/techlab-inventory.db`**.
+Na validação de **24/11/2026**, a suíte executou **30 testes JUnit 5**, com **0 falhas, 0 erros e 0 testes ignorados**. A cobertura inclui modelagem e validação do domínio, DAOs, conexão SQLite, persistência CSV, filtros, notificações, complementação de registros legados e rollback de transações. Os testes de integração com o banco utilizam arquivos SQLite temporários; **não utilizam o banco local `dados/techlab-inventory.db`**.
 
 Para compilar, testar e empacotar:
 
@@ -87,7 +87,7 @@ Para compilar, testar e empacotar:
 mvn clean package
 ```
 
-O artefato é gerado em `target/techlab-inventory-1.0.0-SNAPSHOT.jar`. **Esse JAR não inclui todas as dependências externas**; a forma recomendada de execução neste projeto é `mvn exec:java`.
+O artefato é gerado em `target/techlab-inventory-1.0.0.jar`. **Esse JAR não inclui todas as dependências externas**; a forma recomendada de execução neste projeto é `mvn exec:java`.
 
 ## Arquitetura e organização
 
@@ -194,6 +194,13 @@ A aplicação habilita as restrições de chaves estrangeiras por conexão e imp
 
 **Segurança dos dados locais:** o banco de execução padrão fica em `dados/techlab-inventory.db`, não é versionado e permanece separado do banco legado `techlab.db`. A aplicação bloqueia a abertura direta do banco legado `techlab.db` por meio da configuração de conexão. O caminho de teste `techlab-fase2-teste.db` é aceito somente quando esse arquivo já existe; no uso normal, execute sem argumentos para abrir o banco isolado `dados/techlab-inventory.db`.
 
+
+### Controle de transações
+
+A complementação de registros legados utiliza uma única conexão JDBC para atualizar e validar os dados antes do commit. Se ocorrer uma falha de validação, a operação executa rollback.
+
+Os testes automatizados verificam a preservação dos registros anteriores em cenários de falha.
+
 ## CSV: importação e exportação
 
 Na opção **11**, o programa exporta os registros de equipamentos para `../TechLabCSV-exportacoes/ativos-<timestamp>.csv` (**um nível acima da pasta do projeto**). A pasta de destino deve permitir gravação no computador utilizado.
@@ -201,6 +208,11 @@ Na opção **11**, o programa exporta os registros de equipamentos para `../Tech
 Na opção **12**, o usuário informa o caminho de um arquivo CSV compatível e precisa confirmar a operação digitando `IMPORTAR`. A importação adiciona apenas patrimônios inexistentes; os IDs do arquivo não são reutilizados. A inserção ocorre em uma transação para evitar importações parcialmente gravadas em caso de falha.
 
 O formato de CSV usa codificação UTF-8, separador `;` e cabeçalho validado. Os campos com `;` ou aspas recebem tratamento de escape.
+
+
+A exportação utiliza um arquivo temporário, que é movido para o destino definitivo após a conclusão da escrita. Arquivos existentes não são sobrescritos. Em caso de falha durante a escrita, o sistema tenta remover o arquivo temporário.
+
+O formato CSV não suporta quebras de linha dentro dos campos.
 
 ## Tratamento de erros
 
@@ -232,7 +244,7 @@ Projeto desenvolvido no contexto da disciplina **Programação Orientada a Objet
 | Coleções, DTOs, filtragem e ordenação | `dao/*Resumo.java` e `service/ConsultaService.java` |
 | Arquivo CSV e banco relacional | `repository/AtivoArquivoRepository.java` e SQLite |
 | CRUD e proteção contra SQL Injection | `dao/AtivoDAO.java`, `dao/ChamadoDAO.java` e `PreparedStatement` |
-| Histórico Git, documentação, diagramas e tag final | Commits e README presentes; tag `v1.0-final` pendente |
+| Histórico Git, documentação, diagramas e tag final | Histórico de commits, documentação, diagramas e tag `v1.0-final` |
 
 ## Roteiro rápido de demonstração
 
@@ -244,7 +256,15 @@ Projeto desenvolvido no contexto da disciplina **Programação Orientada a Objet
 6. Mostre os filtros das opções **15** e **16** e a notificação ao atualizar um chamado.
 7. Apresente as opções **11** e **12** para persistência CSV. Faça testes de importação apenas com arquivos de demonstração.
 
-## Situação da entrega final
 
-A tag `v1.0-final` **ainda não foi criada**. Antes de considerar o projeto entregue, é necessário revisar o README, executar `mvn clean package` em um clone atualizado, confirmar as funcionalidades demonstradas e **integrar a branch `feat/integracao-professor` à `main`**, que é a branch de referência no procedimento de entrega do enunciado. A tag final deverá apontar para o commit consolidado aprovado, sem adicionar bancos locais ou artefatos temporários ao Git.
+## Limitações conhecidas
 
+- Aplicação de console, destinada ao uso local.
+- Não possui autenticação ou gerenciamento de usuários.
+- Não foi projetada para operações concorrentes complexas.
+- A exportação CSV não oferece garantia absoluta de atomicidade em caso de interrupção abrupta do processo.
+- Os custos de manutenção de servidores e estações de trabalho utilizam critérios ilustrativos adotados no projeto.
+
+## Versionamento
+
+A branch `main` é a referência de entrega do projeto. A tag `v1.0-final` identifica a versão originalmente consolidada para a avaliação final. As revisões posteriores são registradas no histórico de commits.
