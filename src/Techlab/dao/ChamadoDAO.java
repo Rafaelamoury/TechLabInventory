@@ -22,23 +22,28 @@ public final class ChamadoDAO implements IPersistencia<ChamadoSuporte> {
     private static final String CAMPOS = "id, descricao, ativo_id, titulo, prioridade, data_abertura";
 
     public ChamadoDAO(IConexaoBD banco) {
-        if (banco == null) throw new IllegalArgumentException("Conexao obrigatoria.");
+        if (banco == null)
+            throw new IllegalArgumentException("Conexao obrigatoria.");
         this.banco = banco;
     }
 
     @Override
     public void salvar(ChamadoSuporte chamado) throws SQLException {
-        if (chamado == null) throw new IllegalArgumentException("Chamado obrigatorio.");
-        if (chamado.getId() != 0) throw new IllegalArgumentException("Chamado ja salvo; use atualizar.");
+        if (chamado == null)
+            throw new IllegalArgumentException("Chamado obrigatorio.");
+        if (chamado.getId() != 0)
+            throw new IllegalArgumentException("Chamado ja salvo; use atualizar.");
         String sql = "INSERT INTO chamados (descricao, ativo_id, titulo, prioridade, data_abertura) "
-                   + "VALUES (?, ?, ?, ?, ?)";
+                + "VALUES (?, ?, ?, ?, ?)";
         try (Connection conn = banco.obterConexao();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
+                PreparedStatement stmt = conn.prepareStatement(sql)) {
             preencher(stmt, chamado);
-            if (stmt.executeUpdate() != 1) throw new SQLException("Nao foi possivel cadastrar chamado.");
+            if (stmt.executeUpdate() != 1)
+                throw new SQLException("Nao foi possivel cadastrar chamado.");
             try (Statement idStmt = conn.createStatement();
-                 ResultSet rs = idStmt.executeQuery("SELECT last_insert_rowid()")) {
-                if (!rs.next()) throw new SQLException("ID do chamado nao retornado.");
+                    ResultSet rs = idStmt.executeQuery("SELECT last_insert_rowid()")) {
+                if (!rs.next())
+                    throw new SQLException("ID do chamado nao retornado.");
                 chamado.setId(rs.getInt(1));
             }
         }
@@ -46,10 +51,19 @@ public final class ChamadoDAO implements IPersistencia<ChamadoSuporte> {
 
     @Override
     public ChamadoSuporte buscarPorId(int id) throws SQLException {
+        try (Connection conn = banco.obterConexao()) {
+            return buscarPorId(conn, id);
+        }
+    }
+
+    public ChamadoSuporte buscarPorId(Connection conn, int id) throws SQLException {
         exigirId(id);
-        try (Connection conn = banco.obterConexao();
-             PreparedStatement stmt = conn.prepareStatement("SELECT " + CAMPOS + " FROM chamados WHERE id=?")) {
+
+        String sql = "SELECT " + CAMPOS + " FROM chamados WHERE id = ?";
+
+        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
             stmt.setInt(1, id);
+
             try (ResultSet rs = stmt.executeQuery()) {
                 return rs.next() ? mapearCompleto(rs) : null;
             }
@@ -60,9 +74,10 @@ public final class ChamadoDAO implements IPersistencia<ChamadoSuporte> {
     public List<ChamadoSuporte> listarTodos() throws SQLException {
         List<ChamadoSuporte> chamados = new ArrayList<>();
         try (Connection conn = banco.obterConexao();
-             PreparedStatement stmt = conn.prepareStatement("SELECT " + CAMPOS + " FROM chamados ORDER BY id");
-             ResultSet rs = stmt.executeQuery()) {
-            while (rs.next()) chamados.add(mapearCompleto(rs));
+                PreparedStatement stmt = conn.prepareStatement("SELECT " + CAMPOS + " FROM chamados ORDER BY id");
+                ResultSet rs = stmt.executeQuery()) {
+            while (rs.next())
+                chamados.add(mapearCompleto(rs));
         }
         return chamados;
     }
@@ -71,8 +86,8 @@ public final class ChamadoDAO implements IPersistencia<ChamadoSuporte> {
     public List<ChamadoResumo> listarResumos() throws SQLException {
         List<ChamadoResumo> resumos = new ArrayList<>();
         try (Connection conn = banco.obterConexao();
-             PreparedStatement stmt = conn.prepareStatement("SELECT " + CAMPOS + " FROM chamados ORDER BY id");
-             ResultSet rs = stmt.executeQuery()) {
+                PreparedStatement stmt = conn.prepareStatement("SELECT " + CAMPOS + " FROM chamados ORDER BY id");
+                ResultSet rs = stmt.executeQuery()) {
             while (rs.next()) {
                 resumos.add(new ChamadoResumo(rs.getInt("id"), rs.getString("descricao"),
                         rs.getInt("ativo_id"), String.join(", ", pendencias(rs))));
@@ -83,14 +98,16 @@ public final class ChamadoDAO implements IPersistencia<ChamadoSuporte> {
 
     @Override
     public void atualizar(ChamadoSuporte chamado) throws SQLException {
-        if (chamado == null) throw new IllegalArgumentException("Chamado obrigatorio.");
+        if (chamado == null)
+            throw new IllegalArgumentException("Chamado obrigatorio.");
         exigirId(chamado.getId());
         String sql = "UPDATE chamados SET descricao=?, ativo_id=?, titulo=?, prioridade=?, data_abertura=? WHERE id=?";
         try (Connection conn = banco.obterConexao();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
+                PreparedStatement stmt = conn.prepareStatement(sql)) {
             preencher(stmt, chamado);
             stmt.setInt(6, chamado.getId());
-            if (stmt.executeUpdate() != 1) throw new ChamadoNaoEncontradoException(chamado.getId());
+            if (stmt.executeUpdate() != 1)
+                throw new ChamadoNaoEncontradoException(chamado.getId());
         }
     }
 
@@ -98,9 +115,10 @@ public final class ChamadoDAO implements IPersistencia<ChamadoSuporte> {
     public void deletar(int id) throws SQLException {
         exigirId(id);
         try (Connection conn = banco.obterConexao();
-             PreparedStatement stmt = conn.prepareStatement("DELETE FROM chamados WHERE id=?")) {
+                PreparedStatement stmt = conn.prepareStatement("DELETE FROM chamados WHERE id=?")) {
             stmt.setInt(1, id);
-            if (stmt.executeUpdate() != 1) throw new ChamadoNaoEncontradoException(id);
+            if (stmt.executeUpdate() != 1)
+                throw new ChamadoNaoEncontradoException(id);
         }
     }
 
@@ -130,26 +148,41 @@ public final class ChamadoDAO implements IPersistencia<ChamadoSuporte> {
 
     private static List<String> pendencias(ResultSet rs) throws SQLException {
         List<String> faltas = new ArrayList<>();
-        if (vazio(rs.getString("titulo"))) faltas.add("titulo");
-        if (vazio(rs.getString("descricao"))) faltas.add("descricao");
+        if (vazio(rs.getString("titulo")))
+            faltas.add("titulo");
+        if (vazio(rs.getString("descricao")))
+            faltas.add("descricao");
         String prioridade = rs.getString("prioridade");
-        if (vazio(prioridade)) faltas.add("prioridade");
+        if (vazio(prioridade))
+            faltas.add("prioridade");
         else {
-            try { PrioridadeChamado.valueOf(prioridade); }
-            catch (IllegalArgumentException e) { faltas.add("prioridade invalida"); }
+            try {
+                PrioridadeChamado.valueOf(prioridade);
+            } catch (IllegalArgumentException e) {
+                faltas.add("prioridade invalida");
+            }
         }
         String data = rs.getString("data_abertura");
-        if (vazio(data)) faltas.add("data_abertura");
+        if (vazio(data))
+            faltas.add("data_abertura");
         else {
-            try { LocalDateTime.parse(data); }
-            catch (DateTimeParseException e) { faltas.add("data_abertura invalida"); }
+            try {
+                LocalDateTime.parse(data);
+            } catch (DateTimeParseException e) {
+                faltas.add("data_abertura invalida");
+            }
         }
-        if (rs.getInt("ativo_id") <= 0) faltas.add("ativo_id");
+        if (rs.getInt("ativo_id") <= 0)
+            faltas.add("ativo_id");
         return faltas;
     }
 
-    private static boolean vazio(String texto) { return texto == null || texto.isBlank(); }
+    private static boolean vazio(String texto) {
+        return texto == null || texto.isBlank();
+    }
+
     private static void exigirId(int id) {
-        if (id <= 0) throw new IllegalArgumentException("ID deve ser positivo.");
+        if (id <= 0)
+            throw new IllegalArgumentException("ID deve ser positivo.");
     }
 }

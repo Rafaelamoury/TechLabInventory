@@ -28,7 +28,8 @@ public final class AtivoDAO implements IPersistencia<AtivoTI> {
     private final IConexaoBD conexaoBD;
 
     public AtivoDAO(IConexaoBD conexaoBD) {
-        if (conexaoBD == null) throw new IllegalArgumentException("Conexao obrigatoria.");
+        if (conexaoBD == null)
+            throw new IllegalArgumentException("Conexao obrigatoria.");
         this.conexaoBD = conexaoBD;
     }
 
@@ -39,13 +40,15 @@ public final class AtivoDAO implements IPersistencia<AtivoTI> {
                 + "status, data_aquisicao, ip_estatico, sistema_operacional, memoria_ram_gb, "
                 + "departamento, responsavel, numero_portas) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
         try (Connection conn = conexaoBD.obterConexao();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
+                PreparedStatement stmt = conn.prepareStatement(sql)) {
             preencherParametros(stmt, ativo);
             int linhas = stmt.executeUpdate();
-            if (linhas != 1) throw new SQLException("Cadastro nao gravou exatamente um ativo.");
+            if (linhas != 1)
+                throw new SQLException("Cadastro nao gravou exatamente um ativo.");
             try (Statement idStmt = conn.createStatement();
-                 ResultSet rs = idStmt.executeQuery("SELECT last_insert_rowid()")) {
-                if (!rs.next()) throw new SQLException("ID gerado nao encontrado.");
+                    ResultSet rs = idStmt.executeQuery("SELECT last_insert_rowid()")) {
+                if (!rs.next())
+                    throw new SQLException("ID gerado nao encontrado.");
                 ativo.setId(rs.getInt(1));
             }
         }
@@ -53,27 +56,33 @@ public final class AtivoDAO implements IPersistencia<AtivoTI> {
 
     @Override
     public AtivoTI buscarPorId(int id) throws SQLException {
+        try (Connection conn = conexaoBD.obterConexao()) {
+            return buscarPorId(conn, id);
+        }
+    }
+
+    public AtivoTI buscarPorId(Connection conn, int id) throws SQLException {
         exigirId(id);
-        try (Connection conn = conexaoBD.obterConexao();
-             PreparedStatement stmt = conn.prepareStatement("SELECT " + COLUNAS + " FROM ativos WHERE id = ?")) {
+
+        String sql = "SELECT " + COLUNAS + " FROM ativos WHERE id = ?";
+
+        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
             stmt.setInt(1, id);
+
             try (ResultSet rs = stmt.executeQuery()) {
                 return rs.next() ? mapearCompleto(rs) : null;
             }
         }
     }
 
-    /**
-     * Devolve todos os ativos se TODOS estiverem completos. Nunca ignora
-     * registros antigos, nem inventa data, IP ou outros atributos.
-     */
     @Override
     public List<AtivoTI> listarTodos() throws SQLException {
         List<AtivoTI> ativos = new ArrayList<>();
         try (Connection conn = conexaoBD.obterConexao();
-             PreparedStatement stmt = conn.prepareStatement("SELECT " + COLUNAS + " FROM ativos ORDER BY id");
-             ResultSet rs = stmt.executeQuery()) {
-            while (rs.next()) ativos.add(mapearCompleto(rs));
+                PreparedStatement stmt = conn.prepareStatement("SELECT " + COLUNAS + " FROM ativos ORDER BY id");
+                ResultSet rs = stmt.executeQuery()) {
+            while (rs.next())
+                ativos.add(mapearCompleto(rs));
         }
         return ativos;
     }
@@ -82,8 +91,8 @@ public final class AtivoDAO implements IPersistencia<AtivoTI> {
     public List<AtivoResumo> listarResumos() throws SQLException {
         List<AtivoResumo> resumos = new ArrayList<>();
         try (Connection conn = conexaoBD.obterConexao();
-             PreparedStatement stmt = conn.prepareStatement("SELECT " + COLUNAS + " FROM ativos ORDER BY id");
-             ResultSet rs = stmt.executeQuery()) {
+                PreparedStatement stmt = conn.prepareStatement("SELECT " + COLUNAS + " FROM ativos ORDER BY id");
+                ResultSet rs = stmt.executeQuery()) {
             while (rs.next()) {
                 resumos.add(new AtivoResumo(rs.getInt("id"), rs.getString("patrimonio"),
                         rs.getString("nome"), rs.getString("categoria"),
@@ -95,13 +104,14 @@ public final class AtivoDAO implements IPersistencia<AtivoTI> {
 
     @Override
     public void atualizar(AtivoTI ativo) throws SQLException {
-        if (ativo == null) throw new IllegalArgumentException("Ativo obrigatorio.");
+        if (ativo == null)
+            throw new IllegalArgumentException("Ativo obrigatorio.");
         exigirId(ativo.getId());
         String sql = "UPDATE ativos SET patrimonio=?, nome=?, categoria=?, detalhe_especifico=?, "
                 + "status=?, data_aquisicao=?, ip_estatico=?, sistema_operacional=?, memoria_ram_gb=?, "
                 + "departamento=?, responsavel=?, numero_portas=? WHERE id=?";
         try (Connection conn = conexaoBD.obterConexao();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
+                PreparedStatement stmt = conn.prepareStatement(sql)) {
             preencherParametros(stmt, ativo);
             stmt.setInt(13, ativo.getId());
             if (stmt.executeUpdate() != 1) {
@@ -133,23 +143,29 @@ public final class AtivoDAO implements IPersistencia<AtivoTI> {
     }
 
     private static void validarNovo(AtivoTI ativo) {
-        if (ativo == null) throw new IllegalArgumentException("Ativo obrigatorio.");
+        if (ativo == null)
+            throw new IllegalArgumentException("Ativo obrigatorio.");
         if (ativo.getId() != 0) {
             throw new IllegalArgumentException("Ativo ja possui ID: use atualizar em vez de salvar.");
         }
     }
 
     private static void exigirId(int id) {
-        if (id <= 0) throw new IllegalArgumentException("ID deve ser positivo.");
+        if (id <= 0)
+            throw new IllegalArgumentException("ID deve ser positivo.");
     }
 
     private static void preencherParametros(PreparedStatement stmt, AtivoTI ativo) throws SQLException {
         String categoria = ativo.getClass().getSimpleName();
         String detalhe;
-        if (ativo instanceof Servidor s) detalhe = s.getIpEstatico();
-        else if (ativo instanceof EstacaoTrabalho e) detalhe = e.getDepartamento();
-        else if (ativo instanceof DispositivoRede d) detalhe = Integer.toString(d.getNumeroPortas());
-        else throw new IllegalArgumentException("Tipo de ativo desconhecido: " + categoria);
+        if (ativo instanceof Servidor s)
+            detalhe = s.getIpEstatico();
+        else if (ativo instanceof EstacaoTrabalho e)
+            detalhe = e.getDepartamento();
+        else if (ativo instanceof DispositivoRede d)
+            detalhe = Integer.toString(d.getNumeroPortas());
+        else
+            throw new IllegalArgumentException("Tipo de ativo desconhecido: " + categoria);
 
         stmt.setString(1, ativo.getCodigoPatrimonio());
         stmt.setString(2, ativo.getModelo());
@@ -173,8 +189,10 @@ public final class AtivoDAO implements IPersistencia<AtivoTI> {
             stmt.setNull(10, java.sql.Types.VARCHAR);
             stmt.setNull(11, java.sql.Types.VARCHAR);
         }
-        if (ativo instanceof DispositivoRede d) stmt.setInt(12, d.getNumeroPortas());
-        else stmt.setNull(12, java.sql.Types.INTEGER);
+        if (ativo instanceof DispositivoRede d)
+            stmt.setInt(12, d.getNumeroPortas());
+        else
+            stmt.setNull(12, java.sql.Types.INTEGER);
     }
 
     private static AtivoTI mapearCompleto(ResultSet rs) throws SQLException {
@@ -207,22 +225,31 @@ public final class AtivoDAO implements IPersistencia<AtivoTI> {
 
     private static List<String> pendencias(ResultSet rs) throws SQLException {
         List<String> faltas = new ArrayList<>();
-        if (vazio(rs.getString("status"))) faltas.add("status");
+        if (vazio(rs.getString("status")))
+            faltas.add("status");
         String data = rs.getString("data_aquisicao");
-        if (vazio(data)) faltas.add("data_aquisicao");
+        if (vazio(data))
+            faltas.add("data_aquisicao");
         else {
-            try { LocalDateTime.parse(data); }
-            catch (DateTimeParseException e) { faltas.add("data_aquisicao (formato invalido)"); }
+            try {
+                LocalDateTime.parse(data);
+            } catch (DateTimeParseException e) {
+                faltas.add("data_aquisicao (formato invalido)");
+            }
         }
         String categoria = rs.getString("categoria");
         if ("Servidor".equals(categoria)) {
-            if (vazio(rs.getString("ip_estatico"))) faltas.add("ip_estatico");
-            if (vazio(rs.getString("sistema_operacional"))) faltas.add("sistema_operacional");
+            if (vazio(rs.getString("ip_estatico")))
+                faltas.add("ip_estatico");
+            if (vazio(rs.getString("sistema_operacional")))
+                faltas.add("sistema_operacional");
             if (rs.getObject("memoria_ram_gb") == null || rs.getInt("memoria_ram_gb") <= 0)
                 faltas.add("memoria_ram_gb");
         } else if ("EstacaoTrabalho".equals(categoria)) {
-            if (vazio(rs.getString("departamento"))) faltas.add("departamento");
-            if (vazio(rs.getString("responsavel"))) faltas.add("responsavel");
+            if (vazio(rs.getString("departamento")))
+                faltas.add("departamento");
+            if (vazio(rs.getString("responsavel")))
+                faltas.add("responsavel");
         } else if ("DispositivoRede".equals(categoria)) {
             if (rs.getObject("numero_portas") == null || rs.getInt("numero_portas") <= 0)
                 faltas.add("numero_portas");
@@ -232,5 +259,7 @@ public final class AtivoDAO implements IPersistencia<AtivoTI> {
         return faltas;
     }
 
-    private static boolean vazio(String s) { return s == null || s.isBlank(); }
+    private static boolean vazio(String s) {
+        return s == null || s.isBlank();
+    }
 }

@@ -60,16 +60,10 @@ public final class ComplementacaoLegadosService {
 
     public void completarAtivo(int id, Map<String, String> dados) throws SQLException {
         completar("ativos", id, camposPendentesAtivo(id), dados, CAMPOS_ATIVOS);
-        if (!camposPendentesAtivo(id).isEmpty() || ativos.buscarPorId(id) == null) {
-            throw new SQLException("Falhou a verificacao do equipamento apos complementacao.");
-        }
     }
 
     public void completarChamado(int id, Map<String, String> dados) throws SQLException {
         completar("chamados", id, camposPendentesChamado(id), dados, CAMPOS_CHAMADOS);
-        if (!camposPendentesChamado(id).isEmpty() || chamados.buscarPorId(id) == null) {
-            throw new SQLException("Falhou a verificacao do chamado apos complementacao.");
-        }
     }
 
     private void completar(String tabela, int id, List<String> pendentes,
@@ -97,12 +91,43 @@ public final class ComplementacaoLegadosService {
                     else stmt.setString(i++, (String) valor);
                 }
                 stmt.setInt(i, id);
-                if (stmt.executeUpdate() != 1) throw new SQLException("Registro nao atualizado: " + id);
+                if (stmt.executeUpdate() != 1) {
+                    throw new SQLException("Registro nao atualizado: " + id);
+                }
+
+                verificarComplementacao(conexao, tabela, id);
+
                 conexao.commit();
             } catch (SQLException | RuntimeException e) {
-                conexao.rollback();
+                try {
+                    conexao.rollback();
+                } catch (SQLException falhaRollback) {
+                    e.addSuppressed(falhaRollback);
+                }
+
                 throw e;
             }
+        }
+    }
+
+    private void verificarComplementacao(Connection conexao, String tabela, int id)
+            throws SQLException {
+
+        switch (tabela) {
+            case "ativos":
+                if (ativos.buscarPorId(conexao, id) == null) {
+                    throw new SQLException("Falhou a verificacao do equipamento.");
+                }
+                break;
+
+            case "chamados":
+                if (chamados.buscarPorId(conexao, id) == null) {
+                    throw new SQLException("Falhou a verificacao do chamado.");
+                }
+                break;
+
+            default:
+                throw new IllegalArgumentException("Tabela nao permitida: " + tabela);
         }
     }
 
