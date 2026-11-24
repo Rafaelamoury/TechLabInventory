@@ -2,8 +2,11 @@ package Techlab.negocio;
 
 import java.time.LocalDateTime;
 
-/** Subclasse requerida pelo DAO do professor, ainda ausente no repositorio original. */
+
 public class EstacaoTrabalho extends AtivoTI {
+
+    private static final double CUSTO_MANUTENCAO_MENSAL = 80.0;
+
     private String departamento;
     private String responsavel;
 
@@ -37,6 +40,6 @@ public class EstacaoTrabalho extends AtivoTI {
 
     @Override
     public double calcularCustoManutencaoMensal() {
-        return 80.0; // Criterio ilustrativo; confirmar com professor.
-    }
+        return CUSTO_MANUTENCAO_MENSAL;
+}
 }
