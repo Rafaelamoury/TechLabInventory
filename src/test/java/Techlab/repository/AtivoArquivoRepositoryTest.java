@@ -53,4 +53,74 @@ class AtivoArquivoRepositoryTest {
         assertEquals(0, repo.exportarBanco(arquivo));
         assertThrows(IOException.class, () -> repo.exportarBanco(arquivo));
     }
+
+    @Test
+    void naoDeixaArquivoIncompletoQuandoExportacaoFalha()
+            throws IOException, SQLException {
+
+        BancoTemporario bd = new BancoTemporario(pastaTemporaria);
+        AtivoDAO ativos = new AtivoDAO(bd);
+
+        ativos.salvar(new DispositivoRede(
+                "RED-001", "Switch valido", "Ativo", DATA, 24));
+
+        ativos.salvar(new DispositivoRede(
+                "RED-002", "Switch\nModelo invalido", "Ativo", DATA, 8));
+
+        AtivoArquivoRepository repo = new AtivoArquivoRepository(bd);
+
+        Path pastaExportacao = pastaTemporaria.resolve("exportacoes");
+        Path arquivo = pastaExportacao.resolve("saida.csv");
+
+        assertThrows(IllegalArgumentException.class,
+                () -> repo.exportarBanco(arquivo));
+
+        assertFalse(Files.exists(arquivo));
+
+        try (var arquivos = Files.list(pastaExportacao)) {
+            assertEquals(0L, arquivos.count());
+        }
+    }
+
+    @Test
+    void preservaConteudoDeCsvExistente()
+            throws IOException, SQLException {
+
+        BancoTemporario bd = new BancoTemporario(pastaTemporaria);
+        AtivoArquivoRepository repo = new AtivoArquivoRepository(bd);
+
+        Path arquivo = pastaTemporaria.resolve("existente.csv");
+        String conteudoOriginal = "Conteudo original preservado";
+
+        Files.writeString(arquivo, conteudoOriginal);
+
+        assertThrows(IOException.class,
+                () -> repo.exportarBanco(arquivo));
+
+        assertEquals(conteudoOriginal, Files.readString(arquivo));
+    }
+
+    @Test
+    void exportacaoBemSucedidaNaoDeixaArquivosTemporarios()
+            throws IOException, SQLException {
+
+        BancoTemporario bd = new BancoTemporario(pastaTemporaria);
+        AtivoDAO ativos = new AtivoDAO(bd);
+
+        ativos.salvar(new DispositivoRede(
+                "RED-003", "Switch", "Ativo", DATA, 24));
+
+        AtivoArquivoRepository repo = new AtivoArquivoRepository(bd);
+
+        Path pastaExportacao = pastaTemporaria.resolve("exportacoes");
+        Path arquivo = pastaExportacao.resolve("saida.csv");
+
+        assertEquals(1, repo.exportarBanco(arquivo));
+        assertTrue(Files.exists(arquivo));
+        assertEquals(1, repo.carregarTodos(arquivo).size());
+
+        try (var arquivos = Files.list(pastaExportacao)) {
+            assertEquals(1L, arquivos.count());
+        }
+    }
 }

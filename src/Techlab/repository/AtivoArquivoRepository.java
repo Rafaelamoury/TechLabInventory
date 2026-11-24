@@ -76,26 +76,65 @@ public final class AtivoArquivoRepository {
     }
 
     public void salvarTodos(List<AtivoCsvRegistro> registros, Path caminho) throws IOException {
-        if (registros == null || caminho == null)
+        if (registros == null || caminho == null) {
             throw new IllegalArgumentException("Lista e caminho obrigatorios.");
+        }
+
         Path destino = caminho.toAbsolutePath().normalize();
-        if (destino.getParent() != null) Files.createDirectories(destino.getParent());
-        try (BufferedWriter writer = Files.newBufferedWriter(destino, StandardCharsets.UTF_8,
-                StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE)) {
-            writer.write(CABECALHO);
-            writer.newLine();
-            for (AtivoCsvRegistro a : registros) {
-                if (a == null) throw new IllegalArgumentException("CSV nao aceita registro nulo.");
-                String[] valores = {
-                        Integer.toString(a.id()), a.patrimonio(), a.modelo(), a.categoria(),
-                        a.detalheEspecifico(), a.status(), a.dataAquisicao(), a.ipEstatico(),
-                        a.sistemaOperacional(), numero(a.memoriaRamGb()), a.departamento(),
-                        a.responsavel(), numero(a.numeroPortas())};
-                List<String> texto = new ArrayList<>();
-                for (String valor : valores) texto.add(escapar(valor));
-                writer.write(String.join(";", texto));
+
+        if (Files.exists(destino)) {
+            throw new java.nio.file.FileAlreadyExistsException(destino.toString());
+        }
+
+        Files.createDirectories(destino.getParent());
+
+        Path temporario = Files.createTempFile(
+                destino.getParent(), "techlab-exportacao-", ".tmp");
+
+        try {
+            try (BufferedWriter writer = Files.newBufferedWriter(
+                    temporario, StandardCharsets.UTF_8,
+                    StandardOpenOption.WRITE,
+                    StandardOpenOption.TRUNCATE_EXISTING)) {
+
+                writer.write(CABECALHO);
                 writer.newLine();
+
+                for (AtivoCsvRegistro a : registros) {
+                    if (a == null) {
+                        throw new IllegalArgumentException("CSV nao aceita registro nulo.");
+                    }
+
+                    String[] valores = {
+                            Integer.toString(a.id()), a.patrimonio(),
+                            a.modelo(), a.categoria(),
+                            a.detalheEspecifico(), a.status(),
+                            a.dataAquisicao(), a.ipEstatico(),
+                            a.sistemaOperacional(), numero(a.memoriaRamGb()),
+                            a.departamento(), a.responsavel(),
+                            numero(a.numeroPortas())};
+
+                    List<String> texto = new ArrayList<>();
+
+                    for (String valor : valores) {
+                        texto.add(escapar(valor));
+                    }
+
+                    writer.write(String.join(";", texto));
+                    writer.newLine();
+                }
             }
+
+            Files.move(temporario, destino);
+
+        } catch (IOException | RuntimeException erro) {
+            try {
+                Files.deleteIfExists(temporario);
+            } catch (IOException falhaLimpeza) {
+                erro.addSuppressed(falhaLimpeza);
+            }
+
+            throw erro;
         }
     }
 
