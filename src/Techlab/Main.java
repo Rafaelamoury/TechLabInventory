@@ -360,6 +360,11 @@ public final class Main {
 
     /** Preenche apenas valores ausentes; os demais campos e IDs ficam intactos. */
     private void completarAtivoAntigo() throws SQLException {
+        if (ativos.listarResumos().isEmpty()) {
+            System.out.println("Nenhum equipamento cadastrado.");
+            return;
+        }
+
         listarAtivos();
         int id = lerInteiroPositivo("ID do equipamento antigo: ");
         List<String> campos = legados.camposPendentesAtivo(id);
@@ -380,6 +385,11 @@ public final class Main {
     }
 
     private void completarChamadoAntigo() throws SQLException {
+        if (chamados.listarResumos().isEmpty()) {
+            System.out.println("Nenhum chamado cadastrado.");
+            return;
+        }
+
         listarChamados();
         int id = lerInteiroPositivo("ID do chamado antigo: ");
         List<String> campos = legados.camposPendentesChamado(id);
